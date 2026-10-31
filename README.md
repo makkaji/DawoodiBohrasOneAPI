@@ -12,13 +12,13 @@ The site also includes a small browser UI (`index.html`) for clicking through th
 ## How it works
 
 ```
-GitHub Action (hourly / on push / manual)
+GitHub Action (every 6 hours / on push / manual)
   └─ scripts/build-api.mjs  ── uses secret GOOGLE_API_KEY ──▶ Google Drive API
         └─ writes dist/api/*.json
               └─ deployed to GitHub Pages ──▶ your app fetches plain JSON
 ```
 
-The data refreshes every hour by default. To refresh straight away, go to **Actions → Build Drive API and deploy to Pages → Run workflow**.
+The data refreshes every 6 hours by default. After uploading new files, refresh straight away from **Actions → Build Drive API and deploy to Pages → Run workflow**.
 
 ## Setup
 

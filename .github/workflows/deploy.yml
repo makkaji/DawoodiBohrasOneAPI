@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "0 * * * *" # every hour; change to e.g. "0 */6 * * *" for every 6 hours
+    - cron: "0 */6 * * *" # every 6 hours (UTC); uploads are rare, use "Run workflow" for an instant refresh
   workflow_dispatch: # "Run workflow" button for an instant refresh
 
 permissions:
@@ -50,3 +50,16 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # GitHub disables scheduled workflows after 60 days without commits. Re-enabling the workflow
+  # through the API on each scheduled run resets that timer, so rare uploads don't stop the schedule.
+  keepalive:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Keep scheduled runs enabled
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/deploy.yml/enable"
