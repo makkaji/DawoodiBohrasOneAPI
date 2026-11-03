@@ -33,7 +33,7 @@ jobs:
         run: node scripts/build-api.mjs
 
       - name: Add site files
-        run: cp index.html app.js .nojekyll dist/
+        run: cp -R index.html app.js .nojekyll hadith dist/
 
       - uses: actions/configure-pages@v5
 
