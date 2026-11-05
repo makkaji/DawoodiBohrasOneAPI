@@ -114,3 +114,27 @@ Then open http://localhost:8000. The `dist/` folder is git-ignored.
 - **Freshness:** the data is only as fresh as the last Action run. To change how often it runs, edit `cron` in `.github/workflows/deploy.yml`.
 - **Size limits:** GitHub Pages sites can be up to 1 GB, which is far more than these JSON files need.
 - **Private folders:** to keep the Drive folder private, you would need a Google service account instead of an API key. Ask if you need that.
+
+## Lists the app reads from the root folder
+
+Put these JSON files directly in the root Drive folder (not in a subfolder). The workflow checks each one before publishing it. If a file has a mistake, the build fails with a message naming the item, and the last good list stays live. If a file isn't there, the app uses its built-in copy. The app checks for a new version at most every 12 hours.
+
+### `miqaats.json`
+An array of Miqaats, each with `id`, `title`, `misriMonth` (1–12) and `misriDay` (1–30).
+
+### `ziyarat.json`
+An array of places for the app's Ziyarat Places screen, in the order shown. Places are grouped by `country`, in the order each country first appears.
+
+```json
+[
+  {
+    "name": "Raudat Tahera",
+    "about": "Mazaar of Syedna Taher Saifuddin RA and Syedna Mohammed Burhanuddin RA",
+    "city": "Mumbai",
+    "country": "India",
+    "mapsQuery": "Raudat Tahera, Bhendi Bazaar, Mumbai"
+  }
+]
+```
+
+All five fields are required. `mapsQuery` is what the app searches for in the maps app, and it must be different for every place. Start from the app's current list in `DawoodiBohrasOne/app/src/main/assets/ziyarat.json`.

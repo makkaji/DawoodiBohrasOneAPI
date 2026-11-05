@@ -7,6 +7,7 @@
 //   dist/api/folders.json            all subfolders of ROOT_FOLDER_ID
 //   dist/api/folders/<folderId>.json all files inside that subfolder
 //   dist/api/miqaats.json            miqaats.json from the root folder, if present (validated)
+//   dist/api/ziyarat.json            ziyarat.json from the root folder, if present (validated)
 
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -88,33 +89,40 @@ async function getFiles(folderId) {
 }
 
 /**
- * Copies miqaats.json from the root folder into the API. A broken file fails the build, so the
- * previously deployed (good) list stays live instead of being replaced with nothing.
+ * Copies [name] from the root folder into the API after [validate] checks every item. A broken file
+ * fails the build, so the previously deployed (good) list stays live instead of being replaced.
  */
-async function publishMiqaats() {
+async function publishRootList(name, validate) {
   const [file] = await listAll(
-    `'${rootFolderId}' in parents and name = 'miqaats.json' and trashed = false`,
+    `'${rootFolderId}' in parents and name = '${name}' and trashed = false`,
     "id, name, modifiedTime"
   );
   if (!file) {
-    console.log("miqaats.json: not in the root folder, skipped (the app uses its built-in list)");
+    console.log(`${name}: not in the root folder, skipped (the app uses its built-in list)`);
     return;
   }
   const res = await fetch(`${API}/${file.id}?alt=media&key=${apiKey}`);
-  if (!res.ok) throw new Error(`miqaats.json: download failed (HTTP ${res.status})`);
+  if (!res.ok) throw new Error(`${name}: download failed (HTTP ${res.status})`);
   const text = await res.text();
-  let miqaats;
+  let items;
   try {
-    miqaats = JSON.parse(text);
+    items = JSON.parse(text);
   } catch (e) {
-    throw new Error(`miqaats.json is not valid JSON: ${e.message}`);
+    throw new Error(`${name} is not valid JSON: ${e.message}`);
   }
-  if (!Array.isArray(miqaats) || miqaats.length === 0) {
-    throw new Error("miqaats.json must be a non-empty JSON array");
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error(`${name} must be a non-empty JSON array`);
   }
+  items.forEach((item, i) => validate(item, `${name} item ${i + 1}`));
+  // Published as the bare array, exactly the format the app bundles.
+  await writeFile(join(OUT, `api/${name}`), JSON.stringify(items));
+  console.log(`${name}: ${items.length} items`);
+}
+
+function publishMiqaats() {
   const ids = new Set();
-  miqaats.forEach((m, i) => {
-    const where = `miqaats.json item ${i + 1} (${m?.title ?? "no title"})`;
+  return publishRootList("miqaats.json", (m, item) => {
+    const where = `${item} (${m?.title ?? "no title"})`;
     if (typeof m?.id !== "string" || !m.id) throw new Error(`${where}: missing "id"`);
     if (ids.has(m.id)) throw new Error(`${where}: duplicate id "${m.id}"`);
     ids.add(m.id);
@@ -126,9 +134,19 @@ async function publishMiqaats() {
       throw new Error(`${where}: "misriDay" must be 1-30`);
     }
   });
-  // Published as the bare array, exactly the format the app bundles.
-  await writeFile(join(OUT, "api/miqaats.json"), JSON.stringify(miqaats));
-  console.log(`miqaats.json: ${miqaats.length} miqaats`);
+}
+
+function publishZiyarat() {
+  const queries = new Set();
+  return publishRootList("ziyarat.json", (p, item) => {
+    const where = `${item} (${p?.name ?? "no name"})`;
+    for (const field of ["name", "about", "city", "country", "mapsQuery"]) {
+      if (typeof p?.[field] !== "string" || !p[field].trim()) throw new Error(`${where}: missing "${field}"`);
+    }
+    // The app tells places apart by their map search, so each must be different.
+    if (queries.has(p.mapsQuery)) throw new Error(`${where}: duplicate mapsQuery "${p.mapsQuery}"`);
+    queries.add(p.mapsQuery);
+  });
 }
 
 async function writeJson(path, data) {
@@ -141,6 +159,7 @@ await rm(join(OUT, "api"), { recursive: true, force: true });
 await mkdir(join(OUT, "api/folders"), { recursive: true });
 
 await publishMiqaats();
+await publishZiyarat();
 
 const folders = await getFolders(rootFolderId);
 await writeJson("api/folders.json", { generatedAt, count: folders.length, folders });
